@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const screenshotsDir = path.join(projectRoot, 'screenshots');
-const baseURL = process.env.SCREENSHOT_BASE_URL || 'http://127.0.0.1:8127';
+const baseURL = process.env.SCREENSHOT_BASE_URL || 'http://127.0.0.1:8128';
 const baseOrigin = new URL(baseURL).origin;
 const viewport = { width: 1920, height: 870 };
 const maxScreenshots = 12;
@@ -28,6 +28,9 @@ const uploadedFiles = [];
 const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aldoni-screenshot-'));
 const stateDir = path.join(temporaryDir, 'storage-state');
 const dummyImagePath = path.join(temporaryDir, 'foto-karyawan-dummy.png');
+const sweetAlertScript = fs.readFileSync(
+  path.join(projectRoot, 'public', 'argon', 'assets', 'sweetalert2', 'sweetalert2.all.min.js'),
+);
 const dummyAvatar = await sharp({
   create: {
     width: 160,
@@ -66,11 +69,23 @@ async function configurePage(page) {
     });
   });
   await page.route('**/*', async route => {
-    if (new URL(route.request().url()).origin !== baseOrigin) {
-      await route.abort();
+    const requestUrl = new URL(route.request().url());
+    if (requestUrl.origin === baseOrigin) {
+      await route.continue();
       return;
     }
-    await route.continue();
+    if (
+      requestUrl.hostname === 'cdn.jsdelivr.net' &&
+      requestUrl.pathname.startsWith('/npm/sweetalert2@11')
+    ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: sweetAlertScript,
+      });
+      return;
+    }
+    await route.abort();
   });
   page.on('pageerror', error => {
     console.error(`Browser script error: ${error.message}`);
@@ -93,7 +108,16 @@ async function waitUntilReady(page) {
     content: `
       #debugbar, #phpdebugbar, .phpdebugbar, [data-debugbar] { display: none !important; }
       [class*="cookie-banner"], [id*="cookie-banner"], [class*="intercom"], [class*="drift"] { display: none !important; }
+      footer, .footer { display: none !important; }
     `,
+  });
+  await page.evaluate(() => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const remove = [];
+    while (walker.nextNode()) {
+      if (/^\s*>{1,}\s*$/.test(walker.currentNode.textContent || '')) remove.push(walker.currentNode);
+    }
+    remove.forEach(node => node.remove());
   });
   await page.waitForTimeout(1200);
 
@@ -116,7 +140,10 @@ async function waitUntilReady(page) {
 
 async function captureFeature(page, name, caption) {
   const pageHeight = await waitUntilReady(page);
-  const segmentCount = Math.max(1, Math.ceil(pageHeight / viewport.height));
+  const segmentCount = pageHeight <= viewport.height + 16
+    ? 1
+    : Math.ceil(pageHeight / viewport.height);
+  console.log(`${name}: ${pageHeight}px, ${segmentCount} viewport(s)`);
   if (captures.length + segmentCount > maxScreenshots) {
     throw new Error(
       `Batas ${maxScreenshots} screenshot terlampaui saat menangkap ${name}; ` +
@@ -166,6 +193,19 @@ async function openPage(page, route) {
     throw new Error(`Route ${route} merespons ${response?.status() ?? 'tanpa response'}`);
   }
   await waitUntilReady(page);
+}
+
+async function hideStaticEmployeeProfile(page) {
+  const removed = await page.evaluate(() => {
+    const card = document.querySelector('.card-profile-bottom');
+    const template = card?.nextElementSibling;
+    if (!template?.classList.contains('container-fluid')) return false;
+    template.remove();
+    return true;
+  });
+  if (!removed) {
+    throw new Error('Blok profil statis bawaan template tidak ditemukan untuk disembunyikan.');
+  }
 }
 
 async function loginAndSaveState(browser, role) {
@@ -252,7 +292,6 @@ async function main() {
     await captureFeature(adminPage, 'manajemen-pengguna', 'Daftar akun pengguna beserta role akses');
 
     await openPage(adminPage, '/karyawan');
-    await captureFeature(adminPage, 'data-karyawan', 'Data karyawan dengan identitas dan penempatan kerja');
     await adminPage.locator('tbody tr').first().locator('a[href*="/edit"]').first().click();
     await adminPage.waitForURL(/\/karyawan\/\d+\/edit$/);
     await waitUntilReady(adminPage);
@@ -285,9 +324,6 @@ async function main() {
     uploadedFiles.push(uploadedImagePath);
     await captureFeature(adminPage, 'foto-karyawan-berhasil-diunggah', 'Foto dummy berhasil disimpan pada data karyawan');
 
-    await openPage(adminPage, '/absensi');
-    await captureFeature(adminPage, 'rekap-absensi', 'Daftar absensi karyawan dengan status kehadiran');
-
     await openPage(adminPage, '/cuti');
     await adminPage.locator('tbody tr button').first().click();
     await adminPage.locator('.swal2-popup').waitFor({ state: 'visible', timeout: 10000 });
@@ -296,11 +332,15 @@ async function main() {
     karyawan = await loginAndSaveState(browser, 'karyawan');
     const employeePage = karyawan.page;
     await openPage(employeePage, '/dashboard');
+    await hideStaticEmployeeProfile(employeePage);
     await captureFeature(employeePage, 'dashboard-karyawan', 'Dashboard karyawan dengan ringkasan data pribadi');
 
     await openPage(employeePage, '/absen_karyawan');
-    await employeePage.getByRole('button', { name: 'Absen Sekarang' }).click();
-    await employeePage.waitForLoadState('networkidle');
+    const attendanceButton = employeePage.getByRole('button', { name: 'Absen Sekarang' });
+    if (await attendanceButton.count()) {
+      await attendanceButton.click();
+      await employeePage.waitForLoadState('networkidle');
+    }
     await waitUntilReady(employeePage);
     if (!(await employeePage.getByText('Anda telah absen hari ini').count())) {
       throw new Error('Pencatatan absensi dummy tidak menampilkan status berhasil.');
@@ -308,7 +348,9 @@ async function main() {
     await captureFeature(employeePage, 'absensi-harian-berhasil', 'Status absensi harian setelah karyawan mencatat kehadiran');
 
     await openPage(employeePage, '/pengajuan_cuti');
-    await employeePage.getByRole('button', { name: /Buat Pengajuan Cuti Baru/ }).click();
+    const existingDummyLeave = await employeePage.locator('tbody')
+      .getByText('Keperluan keluarga (data contoh)', { exact: true })
+      .count() > 0;
     await employeePage.evaluate(() => {
       const modal = document.getElementById('cutiModal');
       if (window.bootstrap?.Modal) {
@@ -334,15 +376,16 @@ async function main() {
     await employeePage.locator('#cutiModal select[name="jenis_cuti"]').selectOption({ index: 1 });
     await employeePage.locator('#cutiModal textarea[name="alasan"]').fill('Keperluan keluarga (data contoh)');
     await captureFeature(employeePage, 'form-pengajuan-cuti', 'Form pengajuan cuti karyawan terisi dengan data contoh');
-    await Promise.all([
-      employeePage.waitForLoadState('networkidle'),
-      employeePage.locator('#cutiModal button[type="submit"]').click(),
-    ]);
-    await waitUntilReady(employeePage);
-    if (!(await employeePage.getByText('Pengajuan cuti berhasil diajukan').count())) {
-      throw new Error('Pengajuan cuti dummy tidak menampilkan status berhasil.');
+    if (!existingDummyLeave) {
+      await Promise.all([
+        employeePage.waitForLoadState('networkidle'),
+        employeePage.locator('#cutiModal button[type="submit"]').click(),
+      ]);
+      await waitUntilReady(employeePage);
+      if (!(await employeePage.getByText('Pengajuan cuti berhasil diajukan').count())) {
+        throw new Error('Pengajuan cuti dummy tidak menampilkan status berhasil.');
+      }
     }
-    await captureFeature(employeePage, 'pengajuan-cuti-berhasil', 'Riwayat pengajuan cuti setelah formulir berhasil dikirim');
 
     const guestContext = await browser.newContext({ viewport, deviceScaleFactor: 1 });
     const guestPage = await guestContext.newPage();

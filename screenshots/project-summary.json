@@ -1,0 +1,84 @@
+{
+  "slug": "aldoni",
+  "title": "Aplikasi Data Karyawan",
+  "category": "Kepegawaian",
+  "shortDescription": "Aplikasi pengelolaan karyawan, absensi, dan pengajuan cuti dengan akses admin dan karyawan.",
+  "tags": [
+    "Laravel",
+    "PHP",
+    "MySQL"
+  ],
+  "about": "Aplikasi Data Karyawan membantu admin dan karyawan mengelola administrasi SDM, absensi, serta pengajuan cuti. Aplikasi dibangun dengan Laravel 10 dan antarmuka Argon Dashboard; akses fitur dibedakan menjadi role admin dan karyawan.",
+  "features": [
+    "Dashboard ringkas untuk admin dan karyawan.",
+    "Pengelolaan akun dengan role admin dan karyawan.",
+    "Pengelolaan data karyawan, divisi, jabatan, dan jenis cuti.",
+    "Pencatatan absensi harian karyawan.",
+    "Pengajuan cuti serta alur persetujuan admin.",
+    "Unggah foto pada data karyawan."
+  ],
+  "technologies": [
+    "Laravel 10",
+    "PHP 8.1+",
+    "MySQL (default konfigurasi)",
+    "SQLite (basis data demo screenshot)",
+    "Argon Dashboard 2.0.4",
+    "Bootstrap 5",
+    "Chart.js",
+    "SweetAlert2",
+    "Laravel Sanctum",
+    "Vite"
+  ],
+  "liveUrl": null,
+  "repoUrl": null,
+  "screenshots": [
+    {
+      "file": "01-dashboard-admin.webp",
+      "caption": "Dashboard admin dengan ringkasan dan aktivitas karyawan."
+    },
+    {
+      "file": "02-manajemen-pengguna.webp",
+      "caption": "Daftar akun pengguna beserta role akses."
+    },
+    {
+      "file": "03-form-edit-foto-karyawan-bagian-1.webp",
+      "caption": "Form edit karyawan terisi dengan foto dummy terpilih (bagian 1 dari 2)."
+    },
+    {
+      "file": "04-form-edit-foto-karyawan-bagian-2.webp",
+      "caption": "Form edit karyawan terisi dengan foto dummy terpilih (bagian 2 dari 2)."
+    },
+    {
+      "file": "05-foto-karyawan-berhasil-diunggah-bagian-1.webp",
+      "caption": "Foto dummy berhasil disimpan pada data karyawan (bagian 1 dari 2)."
+    },
+    {
+      "file": "06-foto-karyawan-berhasil-diunggah-bagian-2.webp",
+      "caption": "Foto dummy berhasil disimpan pada data karyawan (bagian 2 dari 2)."
+    },
+    {
+      "file": "07-konfirmasi-persetujuan-cuti-bagian-1.webp",
+      "caption": "Konfirmasi admin sebelum menyetujui pengajuan cuti (bagian 1 dari 2)."
+    },
+    {
+      "file": "08-konfirmasi-persetujuan-cuti-bagian-2.webp",
+      "caption": "Konfirmasi admin sebelum menyetujui pengajuan cuti (bagian 2 dari 2)."
+    },
+    {
+      "file": "09-dashboard-karyawan.webp",
+      "caption": "Dashboard karyawan dengan ringkasan data pribadi."
+    },
+    {
+      "file": "10-absensi-harian-berhasil.webp",
+      "caption": "Status absensi harian setelah karyawan mencatat kehadiran."
+    },
+    {
+      "file": "11-form-pengajuan-cuti.webp",
+      "caption": "Form pengajuan cuti karyawan terisi dengan data contoh."
+    },
+    {
+      "file": "12-login.webp",
+      "caption": "Form login aplikasi untuk autentikasi pengguna."
+    }
+  ]
+}
